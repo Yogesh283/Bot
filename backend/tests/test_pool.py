@@ -19,7 +19,7 @@ class FakeTerminal:
     def read_account(self) -> AccountState:
         return self.state
 
-    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None) -> AccountState:
+    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None, account_mode: str = "demo") -> AccountState:
         assert password == "secret-pass"
         assert "secret-pass" not in repr(login)
         self.login_calls.append(login)

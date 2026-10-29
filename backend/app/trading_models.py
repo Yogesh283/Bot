@@ -39,6 +39,7 @@ class Mt5Credential(Base):
     account_login: Mapped[int] = mapped_column(BigInteger)
     server_name: Mapped[str] = mapped_column(String(120))
     password_ciphertext: Mapped[str] = mapped_column(Text)
+    account_mode: Mapped[str] = mapped_column(String(8), default="demo", server_default=text("'demo'"))
     terminal_path: Mapped[str | None] = mapped_column(String(260), nullable=True)
     mobile_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
     vpn_username: Mapped[str | None] = mapped_column(String(120), nullable=True)

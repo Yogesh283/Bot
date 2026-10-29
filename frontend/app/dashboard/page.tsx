@@ -1,12 +1,157 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { useAuth } from "@/components/auth-provider";
 import { ApiError, api } from "@/lib/api";
+import { loadBrokers, type BrokerServer } from "@/lib/brokers";
 import type { DashboardStatus } from "@/lib/types";
+
+type Mt5Session = {
+  stored: boolean;
+  login: number | null;
+  server: string | null;
+  mode: "demo" | "live";
+  connected: boolean;
+};
+
+function Mt5LoginForm() {
+  const [mode, setMode] = useState<"demo" | "live">("demo");
+  const [brokers, setBrokers] = useState<BrokerServer[]>([]);
+  const [server, setServer] = useState("");
+  const [customServer, setCustomServer] = useState("");
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
+  const [session, setSession] = useState<Mt5Session | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let stopped = false;
+    api<Mt5Session>("/mt5/session")
+      .then((saved) => {
+        if (stopped) {
+          return;
+        }
+        setSession(saved);
+        if (saved.mode === "live" || saved.mode === "demo") {
+          setMode(saved.mode);
+        }
+        if (saved.server) {
+          setServer(saved.server);
+        }
+        if (saved.login) {
+          setLoginId(String(saved.login));
+        }
+      })
+      .catch(() => {
+        if (!stopped) {
+          setError("The saved MT5 login could not be loaded.");
+        }
+      });
+    return () => {
+      stopped = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let stopped = false;
+    loadBrokers().then((rows) => {
+      if (!stopped) {
+        setBrokers(rows);
+      }
+    });
+    return () => {
+      stopped = true;
+    };
+  }, []);
+
+  const choices = brokers.filter((row) => row.mode === mode);
+  const selectedServer = server === "other" ? customServer.trim() : server;
+
+  async function connect(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const saved = await api<Mt5Session>("/mt5/session", {
+        method: "POST",
+        body: JSON.stringify({
+          server: selectedServer,
+          login: Number(loginId),
+          password,
+          mode,
+        }),
+      });
+      setSession(saved);
+      setPassword("");
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : "MT5 login was not saved.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={connect} className="mb-4 rounded-lg border border-[#2a2e39] bg-[#131722] p-3 text-[#d1d4dc]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold">MT5 login</p>
+        {session?.connected ? (
+          <p className="text-xs font-semibold text-[#089981]">MT5 Connected</p>
+        ) : (
+          <p className="text-xs text-[#787b86]">Not connected</p>
+        )}
+      </div>
+      {session?.connected ? (
+        <p className="mt-1 text-xs text-[#787b86]">
+          {session.server} · {session.login} · {session.mode === "live" ? "Live" : "Demo"}
+        </p>
+      ) : null}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => { setMode("demo"); setServer(""); }} className={`h-10 rounded border text-sm ${mode === "demo" ? "border-[#089981] bg-[#089981] text-white" : "border-[#2a2e39]"}`}>
+          Demo account
+        </button>
+        <button type="button" onClick={() => { setMode("live"); setServer(""); }} className={`h-10 rounded border text-sm ${mode === "live" ? "border-[#f23645] bg-[#f23645] text-white" : "border-[#2a2e39]"}`}>
+          Live account
+        </button>
+      </div>
+      <label className="mt-3 block text-[11px] uppercase text-[#787b86]">
+        Broker
+        <select aria-label="Broker" value={server} onChange={(event) => setServer(event.target.value)} className="mt-1 h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 text-sm text-[#d1d4dc]">
+          <option value="">Choose a broker server</option>
+          {choices.map((row) => (
+            <option key={`${row.broker}-${row.server}`} value={row.server}>
+              {row.broker} — {row.server}
+            </option>
+          ))}
+          <option value="other">Other server</option>
+        </select>
+      </label>
+      {server === "other" ? (
+        <label className="mt-3 block text-[11px] uppercase text-[#787b86]">
+          Server name
+          <input aria-label="Server name" value={customServer} onChange={(event) => setCustomServer(event.target.value)} className="mt-1 h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 text-sm" />
+        </label>
+      ) : null}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <label className="text-[11px] uppercase text-[#787b86]">
+          Login ID
+          <input aria-label="Login ID" inputMode="numeric" value={loginId} onChange={(event) => setLoginId(event.target.value)} className="mt-1 h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 font-mono text-sm" />
+        </label>
+        <label className="text-[11px] uppercase text-[#787b86]">
+          Password
+          <input aria-label="MT5 password" type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 text-sm" />
+        </label>
+      </div>
+      {error ? <p className="mt-3 text-sm text-[#f23645]">{error}</p> : null}
+      <button type="submit" disabled={busy || !selectedServer || !loginId || !password} className="mt-3 h-11 w-full rounded bg-[#2962ff] text-sm font-semibold text-white disabled:opacity-50">
+        {busy ? "Saving…" : "Connect MT5"}
+      </button>
+    </form>
+  );
+}
 
 function price(value: number | null | undefined) {
   return value == null ? "—" : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -98,6 +243,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell>
+      <Mt5LoginForm />
       <section data-screen="mt5-trade" className="overflow-hidden rounded-lg border border-[#2a2e39] bg-[#131722] text-[#d1d4dc]">
         <div className="flex items-center gap-3 border-b border-[#2a2e39] px-3 py-3">
           <input

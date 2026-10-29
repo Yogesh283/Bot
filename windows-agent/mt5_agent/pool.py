@@ -39,10 +39,12 @@ class Session:
         vpn_password: str | None = None,
         vps_username: str | None = None,
         vps_password: str | None = None,
+        account_mode: str = "demo",
     ) -> None:
         self.user_id = user_id
         self.login = login
         self.server = server
+        self.account_mode = account_mode if account_mode in {"demo", "live"} else "demo"
         self.terminal_path = terminal_path
         self.vpn_username = vpn_username
         self.vps_username = vps_username
@@ -62,7 +64,7 @@ class Session:
 class TerminalClient:
     def read_account(self) -> AccountState: ...
 
-    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None) -> AccountState: ...
+    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None, account_mode: str = "demo") -> AccountState: ...
 
     def disconnect(self) -> None: ...
 
@@ -96,6 +98,7 @@ class ConnectionPool:
         vpn_password: str | None = None,
         vps_username: str | None = None,
         vps_password: str | None = None,
+        account_mode: str = "demo",
     ) -> Session:
         with self._lock:
             current = self._sessions.get(user_id)
@@ -109,6 +112,7 @@ class ConnectionPool:
                 and current._vpn_password == vpn_password
                 and current.vps_username == vps_username
                 and current._vps_password == vps_password
+                and current.account_mode == account_mode
             ):
                 return current
             session = Session(
@@ -121,6 +125,7 @@ class ConnectionPool:
                 vpn_password,
                 vps_username,
                 vps_password,
+                account_mode,
             )
             self._sessions[user_id] = session
             if self._active_user_id == user_id:
@@ -162,6 +167,7 @@ class ConnectionPool:
                 password=session.password,
                 server=session.server,
                 terminal_path=session.terminal_path,
+                account_mode=session.account_mode,
             )
             if not opened.connected or opened.environment not in {"demo", "live"}:
                 session.connected = False
@@ -231,7 +237,7 @@ class MetaTrader5Terminal:
         self._mt5 = mt5
         return _account_from(mt5)
 
-    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None) -> AccountState:
+    def login_demo(self, *, login: int, password: str, server: str, terminal_path: str | None, account_mode: str = "demo") -> AccountState:
         mt5 = self._package()
         if mt5 is None:
             return AccountState(False, "unknown", detail="The MetaTrader5 Python package is not installed.")
@@ -246,10 +252,32 @@ class MetaTrader5Terminal:
             return AccountState(False, "unknown", detail=detail)
         self._mt5 = mt5
         if not mt5.login(int(login), password=password, server=server):
-            detail = f"Demo login failed: {mt5.last_error()}"
+            detail = f"MT5 login failed: {mt5.last_error()}"
             self.disconnect()
             return AccountState(False, "unknown", login, server, detail=detail)
-        return _account_from(mt5)
+        state = _account_from(mt5)
+        chosen = account_mode if account_mode in {"demo", "live"} else "demo"
+        if state.environment == chosen:
+            return AccountState(
+                True,
+                state.environment,
+                state.login,
+                state.server,
+                state.balance,
+                state.equity,
+                state.free_margin,
+                None,
+            )
+        return AccountState(
+            False,
+            state.environment,
+            state.login,
+            state.server,
+            state.balance,
+            state.equity,
+            state.free_margin,
+            f"This login is a {state.environment} account. Choose {state.environment} to use it.",
+        )
 
     def disconnect(self) -> None:
         if self._mt5 is not None:

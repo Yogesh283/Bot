@@ -99,15 +99,25 @@ class Mt5SessionRequest(BaseModel):
     server: str = Field(min_length=1, max_length=120)
     login: int = Field(gt=0)
     password: str = Field(min_length=1, max_length=128)
+    mode: str = Field(default="demo", pattern="^(demo|live)$")
     terminal_path: str | None = Field(default=None, max_length=260)
+
+
+def _session_view(row: Mt5Credential | None) -> dict:
+    if row is None:
+        return {"stored": False, "login": None, "server": None, "mode": "demo", "connected": False}
+    return {
+        "stored": True,
+        "login": row.account_login,
+        "server": row.server_name,
+        "mode": row.account_mode if row.account_mode in {"demo", "live"} else "demo",
+        "connected": True,
+    }
 
 
 @router.get("/mt5/session")
 def read_session(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    row = db.get(Mt5Credential, user.id)
-    if row is None:
-        return {"stored": False, "login": None, "server": None}
-    return {"stored": True, "login": row.account_login, "server": row.server_name}
+    return _session_view(db.get(Mt5Credential, user.id))
 
 
 @router.post("/mt5/session")
@@ -124,6 +134,7 @@ def save_session(
             account_login=body.login,
             server_name=body.server.strip(),
             password_ciphertext=ciphertext,
+            account_mode=body.mode,
             terminal_path=body.terminal_path,
             updated_at=utcnow(),
         )
@@ -132,10 +143,11 @@ def save_session(
         row.account_login = body.login
         row.server_name = body.server.strip()
         row.password_ciphertext = ciphertext
+        row.account_mode = body.mode
         row.terminal_path = body.terminal_path
         row.updated_at = utcnow()
     db.flush()
-    return {"stored": True, "login": row.account_login, "server": row.server_name}
+    return _session_view(row)
 
 
 class DepositRequest(BaseModel):
@@ -213,6 +225,9 @@ def demo_test_order(
     """Queue one Demo order for this user only. Nothing is sent unless confirm is DEMO."""
     if body.confirm != "DEMO":
         raise HTTPException(status_code=422, detail="Type DEMO to queue one Demo order. Nothing was sent.")
+    saved_login = db.get(Mt5Credential, user.id)
+    if saved_login is None or not saved_login.password_ciphertext:
+        raise HTTPException(status_code=409, detail="Save your MT5 login first. Nothing was sent.")
     agent = db.query(TradingAgent).filter(TradingAgent.user_id == user.id).one_or_none()
     if agent is None:
         raise HTTPException(status_code=409, detail="The trading agent is offline. Nothing was sent.")

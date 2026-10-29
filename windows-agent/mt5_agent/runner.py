@@ -185,6 +185,7 @@ def _restore_pooled_session(client: ApiClient, pool: ConnectionPool):
         password=password,
         server=str(server),
         terminal_path=body.get("terminal_path"),
+        account_mode=str(body.get("account_mode") or "demo"),
         vpn_username=body.get("vpn_username"),
         vpn_password=_optional_secret(body.get("vpn_password_ciphertext")),
         vps_username=body.get("vps_username"),

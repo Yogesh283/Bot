@@ -83,12 +83,13 @@ def get_agent(
 def session(agent: TradingAgent = Depends(get_agent), db: Session = Depends(get_db)) -> dict:
     row = db.get(Mt5Credential, agent.user_id)
     if row is None:
-        return {"user_id": str(agent.user_id), "login": None, "server": None, "password_ciphertext": None, "terminal_path": None}
+        return {"user_id": str(agent.user_id), "login": None, "server": None, "password_ciphertext": None, "account_mode": "demo", "terminal_path": None}
     return {
         "user_id": str(agent.user_id),
         "login": row.account_login,
         "server": row.server_name,
         "password_ciphertext": row.password_ciphertext,
+        "account_mode": row.account_mode if row.account_mode in {"demo", "live"} else "demo",
         "terminal_path": row.terminal_path,
         "vpn_username": row.vpn_username,
         "vpn_password_ciphertext": row.vpn_password_ciphertext,
