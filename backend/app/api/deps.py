@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.core.security import InvalidToken, decode_access_token, utcnow
+from app.core.security import InvalidToken, as_utc, decode_access_token, utcnow
 from app.database import get_db
 from app.models import RefreshToken, User
 
@@ -65,7 +65,8 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="Sign in required.", headers={"WWW-Authenticate": "Bearer"})
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This account is disabled.")
-    if session.revoked_at is not None or session.expires_at <= now:
+    expires_at = as_utc(session.expires_at)
+    if session.revoked_at is not None or expires_at is None or expires_at <= now:
         raise HTTPException(status_code=401, detail="Sign in required.", headers={"WWW-Authenticate": "Bearer"})
     return user
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.core.security import (
     AuthError,
+    as_utc,
     create_access_token,
     hash_password,
     hash_token,
@@ -102,7 +103,8 @@ def verify_email(db: Session, raw_token: str, ip: str | None) -> None:
         .with_for_update()
         .one_or_none()
     )
-    if user is None or user.email_verification_expires_at is None or user.email_verification_expires_at <= now:
+    verification_expires = None if user is None else as_utc(user.email_verification_expires_at)
+    if user is None or verification_expires is None or verification_expires <= now:
         raise AuthError(400, "This verification link is invalid or has expired.")
     user.email_verified = True
     user.email_verification_token_hash = None
@@ -170,7 +172,8 @@ def rotate_refresh(db: Session, raw_token: str | None) -> IssuedSession:
         raise AuthError(401, "Sign in required.")
     if row.revoked_at is not None:
         raise AuthError(401, "Sign in required.")
-    if row.expires_at <= now:
+    refresh_expires = as_utc(row.expires_at)
+    if refresh_expires is None or refresh_expires <= now:
         row.revoked_at = now
         db.commit()
         raise AuthError(401, "Sign in required.")
@@ -232,7 +235,8 @@ def reset_password(db: Session, *, raw_token: str, new_password: str, ip: str | 
         .with_for_update()
         .one_or_none()
     )
-    if user is None or user.password_reset_expires_at is None or user.password_reset_expires_at <= now:
+    reset_expires = None if user is None else as_utc(user.password_reset_expires_at)
+    if user is None or reset_expires is None or reset_expires <= now:
         raise AuthError(400, "This reset link is invalid or has expired.")
     user.password_hash = hash_password(new_password)
     user.password_reset_token_hash = None

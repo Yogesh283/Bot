@@ -57,6 +57,15 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime | None) -> datetime | None:
+    """MySQL returns datetimes without a timezone. Compare them as UTC."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def create_access_token(*, user_id: str, session_id: str) -> str:
     settings = get_settings()
     now = utcnow()

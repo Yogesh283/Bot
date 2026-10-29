@@ -6,7 +6,7 @@ from typing import Protocol
 
 from sqlalchemy.orm import Session
 
-from app.core.security import utcnow
+from app.core.security import as_utc, utcnow
 from app.database import SessionLocal
 from app.trading_models import BotConfig, Subscription, TradeCommand
 
@@ -48,7 +48,8 @@ def subscription_view(db: Session, user_id: uuid.UUID) -> dict:
     if row is None:
         return {"plan": "none", "status": "none", "expires_at": None}
     status = row.status if row.status in {"active", "expired", "cancelled"} else "expired"
-    if status == "active" and row.expires_at <= utcnow():
+    plan_expires = as_utc(row.expires_at)
+    if status == "active" and plan_expires is not None and plan_expires <= utcnow():
         status = "expired"
     return {"plan": row.plan, "status": status, "expires_at": row.expires_at}
 
