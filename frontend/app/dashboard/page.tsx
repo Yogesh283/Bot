@@ -24,6 +24,7 @@ function Mt5LoginForm() {
   const [customServer, setCustomServer] = useState("");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [session, setSession] = useState<Mt5Session | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -142,7 +143,12 @@ function Mt5LoginForm() {
         </label>
         <label className="text-[11px] uppercase text-[#787b86]">
           Password
-          <input aria-label="MT5 password" type="password" autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} className="mt-1 h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 text-sm" />
+          <span className="relative mt-1 block">
+            <input aria-label="MT5 password" type={showPassword ? "text" : "password"} autoComplete="off" value={password} onChange={(event) => setPassword(event.target.value)} className="h-10 w-full rounded border border-[#2a2e39] bg-[#1e222d] px-2 pr-14 text-sm" />
+            <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[#787b86]">
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </span>
         </label>
       </div>
       {error ? <p className="mt-3 text-sm text-[#f23645]">{error}</p> : null}
