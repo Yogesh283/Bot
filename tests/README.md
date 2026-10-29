@@ -1,0 +1,1 @@
+Automated tests live in `backend/tests`. They cover accounts plus indicator math, risk checks, and a mock MT5 terminal. They do not log into a broker and they do not place an order. Run them with the commands in the root `README.md`.
