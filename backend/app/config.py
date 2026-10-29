@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 7
     cookie_secure: bool = False
     cookie_name: str = "refresh_token"
-    cors_origins: str = "http://localhost:3000"
-    app_public_url: str = "http://localhost:3000"
-    user_panel_url: str = ""
+    cors_origins: str = "https://updowanfx.com,https://www.updowanfx.com"
+    app_public_url: str = "https://updowanfx.com"
+    user_panel_url: str = "https://updowanfx.com"
     admin_domain: str = ""
     admin_path: str = "xyz26"
     environment: str = "development"
